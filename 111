@@ -1,0 +1,37 @@
+WordPress是需要手动设置站点的URL的，那么问题来了：如果我需要反向代理Wordpress，站点URL到底该怎么写？
+
+那么问题又来了：我为什么要用Docker版WordPress？说实话我很喜欢这种一行就能部署完的东西，它真的很方便（我就是不想看那一大堆的配置教程）。
+
+如果你直接填入你的域名，那么你大概率会得到这样的提示：
+
+该网页无法正常运作
+
+luminoleon.top 将您重定向的次数过多。
+
+原因很简单：Nginx把访问重定向至localhost，WordPress又把访问重定向回原域名，然后不停地循环重定向……
+
+解决方法也很简单：设置WordPress URL时把端口号加上去，http就加80，https就加443。说实话我不知道为什么，这是我多次尝试后的结果。至少它可以用了……
+
+下面附上我的Nginx配置和WordPress URL设置。
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name blogs.luminoleon.top;
+    rewrite ^(.*) https://$host$1 permanent;
+}
+ 
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name blogs.luminoleon.top;
+    ssl_certificate /etc/nginx/ssl/luminoleon.top/cert.pem;
+    ssl_certificate_key /etc/nginx/ssl/luminoleon.top/key.pem;
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host:$server_port;
+        proxy_set_header X-Real-Ip $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_redirect default;
+    }
+}
